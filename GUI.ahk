@@ -1,18 +1,3 @@
-main := new GUI({options:"+Resize", color:"White", font:"s9,Consolas"})
-btnA := main.add("Button", {options:"w120 h30", text:"Hello World"})
-btnA.handler := "Fn"
-btnB := main.add("Button", {options:"xp y+10 wp hp"})
-btnB.text := "Another Button" , btnB.handler := "Fn"
-lbl := main.add("Text", {options:"xp y+10 w200"})
-lbl.font := "cRed s10 italic bold,Arial"
-lbl.text := "Hello World" , lbl.handler := "Fn"
-main.show("w200 h300")
-return
-
-Fn(oCtrl) {
-	MsgBox, % oCtrl.handle "`n" oCtrl.__var "`n" oCtrl.classNN "`n" oCtrl.text
-}
-
 class GUI
 {
 
@@ -132,6 +117,7 @@ class GUI
 	destroy() {
 		this.control.__del()
 		Gui, % this.handle ":Destroy"
+		GUI.__.Remove(this.handle, "")
 		this.handle := false
 	}
 
@@ -283,15 +269,15 @@ class GUI
 			}
 		}
 
-		onEvent() {
+		__onEvent(p*) {
 			static $
 
-			$ := this.handle
-			SetTimer, __CONTROL_Timer, -1
+			$ := SubStr(this.__var, 3)
+			SetTimer, __CONTROL_EventTimer, -1
 			return
-			__CONTROL_Timer:
-			($:=GUI.__GET__($)).handler.($)
-			$ := ""
+			
+			__CONTROL_EventTimer:
+			($:=Object($)).handler.($) , $ := ""
 			return
 		}
 	}
@@ -347,20 +333,65 @@ class GUI
 	
 	}
 
-	__HANDLER__() {
+	__onEvent(lbl, args*) {
+		fn := "__on" . SubStr(lbl, 7)
+		return this[fn](args*)
+	}
+
+	__onClose(p*) {
+		this.destroy()
+		if !GUI.__.MaxIndex()
+			SetTimer, __GUI_Exit, -1
+		return
+	}
+
+	__onEscape(p*) {
+		this.__onClose()
+	}
+
+	__onSize(p*) {
+
+	}
+
+	__onContextMenu(p*) {
+		MsgBox, % Object(SubStr(p.1, 3)).text
+	}
+
+	__HANDLER__(lbl, args*) {
+		GUI.__STATIC__([this, lbl, args*])
+		SetTimer, __GUI_EventTimer, -1
+		return
+
+		__GUI_EventTimer:
+		$ := GUI.__STATIC__() , GUI.__STATIC__("")
+		$.Remove(1).__onEvent($*) , $ := ""
 		return
 
 		__GUI_Close:
-		GUI.__this__.destroy()
-		SetTimer, __GUI_Exit, -1
+		__GUI_Escape:
+		GUI.__this__.__HANDLER__(A_ThisLabel)
+		return
+
+		__GUI_Size:
+		GUI.__this__.__HANDLER__(A_ThisLabel, [A_GuiWidth, A_GuiHeight, A_EventInfo]*)
+		return
+
+		__GUI_ContextMenu:
+		GUI.__this__.__HANDLER__(A_ThisLabel, [A_GuiControl, A_EventInfo, A_GuiX, A_GuiY, A_GuiEvent]*)
 		return
 
 		__GUI_Label:
-		GUI.__thisCtrl__.onEvent()
+		GUI.__thisCtrl__.__onEvent()
 		return
 
 		__GUI_Exit:
 		ExitApp
+	}
+
+	__STATIC__(v*) {
+		static val
+
+		return v.MinIndex() ? (val := v.1) : val
 	}
 }
 
