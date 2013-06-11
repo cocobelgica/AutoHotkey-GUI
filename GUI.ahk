@@ -30,7 +30,7 @@ class GUI
 	__Delete() {
 		if this.handle
 			this.destroy()
-		OutputDebug, DELETED
+		OutputDebug, % this.__Class "[class] DELETED"
 	}
 
 	__Set(k, v, p*) {
@@ -89,6 +89,14 @@ class GUI
 			return false
 		}
 
+		handle() {
+			return (hWnd:=this._.handle)
+			       ? (DllCall("IsWindow", "Ptr", hWnd)
+			         ? hWnd
+			         : (this._.handle := false))
+			       : hWnd
+		}
+
 		title(p*) {
 			dhw := A_DetectHiddenWindows
 			DetectHiddenWindows, On
@@ -112,13 +120,17 @@ class GUI
 
 	show(options:="") {
 		Gui, % this.handle ":Show", % options
+		WinWait, % "ahk_id " this.handle
+		return !ErrorLevel
 	}
 
 	destroy() {
+		if !(hWnd:=this.handle)
+			throw Exception("ERROR", -1)
 		this.control.__del()
-		Gui, % this.handle ":Destroy"
-		GUI.__.Remove(this.handle, "")
-		this.handle := false
+		Gui, % hWnd ":Destroy"
+		GUI.__.Remove(hWnd, "")
+		return !this.handle
 	}
 
 	class __GUICONTROL__
@@ -205,7 +217,7 @@ class GUI
 		}
 
 		__Delete() {
-			;OutputDebug, CONTROL DELETED
+			;OutputDebug, % this.__Class "[class] DELETED"
 		}
 
 		__Set(k, v, p*) {
@@ -312,6 +324,7 @@ class GUI
 			__thisCtrl__(p*) {
 				return Object(SubStr(A_GuiControl, 3))
 			}
+
 		}
 
 		__GET__(hWnd) {
@@ -332,12 +345,7 @@ class GUI
 		}
 	
 	}
-
-	__onEvent(lbl, args*) {
-		fn := "__on" . SubStr(lbl, 7)
-		return this[fn](args*)
-	}
-
+	
 	__onClose(p*) {
 		this.destroy()
 		if !GUI.__.MaxIndex()
@@ -346,6 +354,7 @@ class GUI
 	}
 
 	__onEscape(p*) {
+		OutputDebug, % A_ThisFunc
 		this.__onClose()
 	}
 
@@ -354,17 +363,17 @@ class GUI
 	}
 
 	__onContextMenu(p*) {
-		MsgBox, % Object(SubStr(p.1, 3)).text
+		OutputDebug, % A_ThisFunc
 	}
 
 	__HANDLER__(lbl, args*) {
-		GUI.__STATIC__([this, lbl, args*])
+		GUI.__STATIC__([this, "__on" . SubStr(lbl, 7), args*])
 		SetTimer, __GUI_EventTimer, -1
 		return
 
 		__GUI_EventTimer:
 		$ := GUI.__STATIC__() , GUI.__STATIC__("")
-		$.Remove(1).__onEvent($*) , $ := ""
+		$.Remove(1)[$.Remove(1)]($*) , $ := ""
 		return
 
 		__GUI_Close:
@@ -387,12 +396,13 @@ class GUI
 		__GUI_Exit:
 		ExitApp
 	}
-
+	
 	__STATIC__(v*) {
-		static val
+		static $
 
-		return v.MinIndex() ? (val := v.1) : val
+		return v.MinIndex() ? ($ := v.1) : $
 	}
+
 }
 
 class CONTROL
